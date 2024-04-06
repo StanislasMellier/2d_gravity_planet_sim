@@ -1,5 +1,8 @@
 const canvas = document.getElementById("canva");
 const ctx = canvas.getContext("2d");
+canvas.width = window.innerWidth;
+canvas.height = window.innerHeight;
+
 
 class Body {
     constructor(x, y, velocity, mass, frozen, color) {
@@ -20,6 +23,11 @@ class Simulation {
         this.softeningFactor = 20 || softeningFactor
         this.timeFactor = 1 || timeFactor
 
+        window.addEventListener('resize', () => {
+            this.canvas.width = window.innerWidth
+            this.canvas.height = window.innerHeight
+        })
+
         this.init()
     }
     init() {
@@ -32,7 +40,6 @@ class Simulation {
         this.addBody(xCenter, yCenter - yCenter * -0.5, { x: -2, y: 0 }, 1);
         this.addBody(xCenter, yCenter - yCenter * -0.55, { x: -2.7, y: 0 }, 0.00000001);
 
-        console.log(this.bodies);
     }
     addBody(x, y, velocity, mass, forzen, color) {
         this.bodies.push(new Body(x, y, velocity, mass, forzen, color));
@@ -72,31 +79,39 @@ class Simulation {
             let body = this.bodies[i];
 
             let radius = body.mass * 2 + this.canvas.width * 0.001
-            this.ctx.strokeStyle = `${body.color}`;
+            this.ctx.fillStyle = `${body.color}`;
             this.ctx.beginPath();
             this.ctx.arc(body.x, body.y, radius, 0, Math.PI * 2);
-            this.ctx.stroke()
+            this.ctx.fill()
         }
     }
 }
 const simulation = new Simulation(canvas);
 
-let body = { x: 0, y: 0, velocity: { x: 0, y: 0 } }
+let body = { x: 0, y: 0, velocity: { x: 0, y: 0 }, mass: 1, color: '#ffffff', frozen: false }
+
+let gui = new dat.GUI()
+
+let SimulationFolder = gui.addFolder("Simulation");
+let softeningController = SimulationFolder.add(simulation, 'softeningFactor', 0, 100);
+
+let AddBodyParameterFoler = gui.addFolder("Add Body Parameter");
+let AddBodyMassController = AddBodyParameterFoler.add(body, 'mass', 0, 100)
+let AddBodyColorController = AddBodyParameterFoler.addColor(body, 'color')
+let AddBodyFrozenController = AddBodyParameterFoler.add(body, 'frozen')
+
 
 canvas.addEventListener('mousedown', (e) => {
-    console.log(e);
     body.x = e.offsetX
     body.y = e.offsetY
-    console.log(simulation.bodies);
 })
 canvas.addEventListener('mouseup', (e) => {
-    console.log(e);
+    if (!body) return
     body.velocity.x = (body.x - e.offsetX) * 0.05
     body.velocity.y = (body.y - e.offsetY) * 0.05
-    simulation.addBody(body.x, body.y, body.velocity)
-
-    console.log(simulation.bodies);
+    simulation.addBody(e.offsetX, e.offsetY, { x: body.velocity.x, y: body.velocity.y }, body.mass, body.frozen, body.color)
 })
+
 
 let fps = 60;
 let frameRate = 1000 / fps;
