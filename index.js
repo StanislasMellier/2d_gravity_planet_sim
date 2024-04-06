@@ -93,9 +93,13 @@ let body = { x: 0, y: 0, velocity: { x: 0, y: 0 }, mass: 1, color: '#ffffff', fr
 let gui = new dat.GUI()
 
 let SimulationFolder = gui.addFolder("Simulation");
+SimulationFolder.open()
 let softeningController = SimulationFolder.add(simulation, 'softeningFactor', 0, 100);
-
+let centerStarController = SimulationFolder.add(simulation.bodies[0], 'mass', 0, 100);
+centerStarController.name("Mass of the  star")
 let AddBodyParameterFoler = gui.addFolder("Add Body Parameter");
+AddBodyParameterFoler.open()
+
 let AddBodyMassController = AddBodyParameterFoler.add(body, 'mass', 0, 100)
 let AddBodyColorController = AddBodyParameterFoler.addColor(body, 'color')
 let AddBodyFrozenController = AddBodyParameterFoler.add(body, 'frozen')
