@@ -83,8 +83,8 @@ class Simulation {
             let clickXCoordInSimulation = this.camera.x + (clickXFromCanvaCenter / this.camera.zoom)
             let clickYCoordInSimulation = this.camera.y + (clickYFromCanvaCenter / this.camera.zoom)
 
-            body.velocity.x = (body.x - clickXCoordInSimulation) * 0.05
-            body.velocity.y = (body.y - clickYCoordInSimulation) * 0.05
+            body.velocity.x = ((body.x - clickXCoordInSimulation) * 0.05) * this.camera.zoom
+            body.velocity.y = ((body.y - clickYCoordInSimulation) * 0.05) * this.camera.zoom
             this.addBody(body.x, body.y, { x: body.velocity.x, y: body.velocity.y }, body.mass, body.frozen, body.color)
         })
     }
