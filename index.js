@@ -28,7 +28,13 @@ class Simulation {
         this.followCenterOfSimulation = false
 
         this.gui = new dat.GUI()
-        this.guiElement = {}
+        this.guiElement = {
+            folder: [],
+            controller: []
+        }
+        this.event = {}
+
+        this.defaultSettings = { G: 1, softeningFactor: this.softeningFactor, timeFactor: this.timeFactor, camera: { ...this.camera }, followCenterOfSimulation: this.followCenterOfSimulation }
         window.addEventListener('resize', () => {
             this.canvas.width = window.innerWidth
             this.canvas.height = window.innerHeight
@@ -37,8 +43,10 @@ class Simulation {
         this.init()
     }
     init() {
+
         let SimulationFolder = this.gui.addFolder("Simulation");
         SimulationFolder.open()
+        this.guiElement.folder.push(SimulationFolder)
 
         let cameraZoomController = SimulationFolder.add(this.camera, 'zoom', 0, 1);
         cameraZoomController.name('Camera zoom');
@@ -47,11 +55,26 @@ class Simulation {
         let FollowCenterController = SimulationFolder.add(this, 'followCenterOfSimulation');
         FollowCenterController.name('Camera centered');
 
-        this.guiElement = { ...this.guiElement, SimulationFolder, cameraZoomController, softeningController, timeFactorController, FollowCenterController }
-
-        this.loadExemple()
         this.handleMouseAddBody()
+        this.loadExemple()
 
+        let resetController = this.gui.add(this, 'reset');
+        this.guiElement.controller.push(cameraZoomController, softeningController, timeFactorController, FollowCenterController, resetController)
+
+
+    }
+    reset() {
+        for (const event in this.event) {
+            this.canvas.removeEventListener(event, this.event[event])
+        }
+        for (const settingName in this.defaultSettings) {
+            const setting = this.defaultSettings[settingName];
+            this[settingName] = JSON.parse(JSON.stringify(setting)) // sry
+        }
+        this.gui.destroy()
+        this.gui = new dat.GUI()
+        this.bodies = []
+        this.init()
     }
     addBody(x, y, velocity, mass, forzen, color) {
         this.bodies.push(new Body(x, y, velocity, mass, forzen, color));
@@ -61,21 +84,32 @@ class Simulation {
 
         let AddBodyParameterFoler = this.gui.addFolder("Add Body Parameter");
         AddBodyParameterFoler.open()
+        this.guiElement.folder.push(AddBodyParameterFoler)
+
 
         let AddBodyMassController = AddBodyParameterFoler.add(body, 'mass')
         let AddBodyColorController = AddBodyParameterFoler.addColor(body, 'color')
         let AddBodyFrozenController = AddBodyParameterFoler.add(body, 'frozen')
 
-        this.guiElement = { ...this.guiElement, AddBodyParameterFoler, AddBodyMassController, AddBodyColorController, AddBodyFrozenController }
+        this.guiElement.controller.push(AddBodyMassController, AddBodyColorController, AddBodyFrozenController)
 
-        this.canvas.addEventListener('mousedown', (e) => {
+        const mouseDown = (e) => {
+            this.addBodyClicked = true;
+
             let clickXFromCanvaCenter = e.offsetX - (this.canvas.width / 2)
             let clickYFromCanvaCenter = e.offsetY - (this.canvas.height / 2)
             body.x = this.camera.x + (clickXFromCanvaCenter / this.camera.zoom)
             body.y = this.camera.y + (clickYFromCanvaCenter / this.camera.zoom)
-        })
-        this.canvas.addEventListener('mouseup', (e) => {
+
+            this.addbodyClickedInfo = { startX: body.x, startY: body.y }
+        }
+
+        this.canvas.addEventListener('mousedown', mouseDown)
+        this.event.mousedown = mouseDown
+
+        const mouseUp = (e) => {
             if (!body) return
+            this.addBodyClicked = false;
 
             let clickXFromCanvaCenter = e.offsetX - (this.canvas.width / 2)
             let clickYFromCanvaCenter = e.offsetY - (this.canvas.height / 2)
@@ -86,7 +120,16 @@ class Simulation {
             body.velocity.x = ((body.x - clickXCoordInSimulation) * 0.05) * this.camera.zoom
             body.velocity.y = ((body.y - clickYCoordInSimulation) * 0.05) * this.camera.zoom
             this.addBody(body.x, body.y, { x: body.velocity.x, y: body.velocity.y }, body.mass, body.frozen, body.color)
-        })
+        }
+        this.canvas.addEventListener('mouseup', mouseUp)
+        this.event.mouseup = mouseUp
+
+        const mouseMove = (e) => {
+            this.mousePositionOnCanvas = { x: e.offsetX, y: e.offsetY }
+        }
+        this.canvas.addEventListener('mousemove', mouseMove)
+        this.event.mousemove = mouseMove
+
     }
 
     loadExemple() {
@@ -139,6 +182,22 @@ class Simulation {
     draw() {
         this.ctx.fillStyle = "rgba(0,0,0,1.0)";
         ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        if (this.addBodyClicked) {
+
+            let clickXFromCam = (this.addbodyClickedInfo.startX - this.camera.x) * this.camera.zoom
+            let clickYFromCam = (this.addbodyClickedInfo.startY - this.camera.y) * this.camera.zoom
+            let clickXOnCanva = clickXFromCam + this.canvas.width / 2
+            let clickYOnCanva = clickYFromCam + this.canvas.height / 2
+
+            this.ctx.strokeStyle = 'green'
+            this.ctx.lineWidth = this.canvas.width * 0.001
+            this.ctx.beginPath()
+            this.ctx.moveTo(clickXOnCanva, clickYOnCanva)
+            this.ctx.lineTo(this.mousePositionOnCanvas.x, this.mousePositionOnCanvas.y)
+            ctx.stroke()
+        }
+
 
         for (let i = 0; i < this.bodies.length; i++) {
             let body = this.bodies[i];
