@@ -3,7 +3,6 @@ const ctx = canvas.getContext("2d");
 canvas.width = window.innerWidth;
 canvas.height = window.innerHeight;
 
-
 class Body {
     constructor(x, y, velocity, mass, frozen, color) {
         this.x = x
@@ -13,7 +12,6 @@ class Body {
         this.mass = mass || 1
         this.color = color || "white"
     }
-
 }
 class Simulation {
     constructor(canvas, softeningFactor, timeFactor) {
@@ -24,8 +22,38 @@ class Simulation {
         this.softeningFactor = 20 || softeningFactor
         this.timeFactor = 0.1 || timeFactor
 
+        this.clearStrength = 1
         this.camera = { x: 0, y: 0, zoom: 1 }
         this.followCenterOfSimulation = false
+
+        this.avaiableScenarios = ["twoPlanetStarSystem", 'galaxy']
+        this.scenarioSettings = {
+            "twoPlanetStarSystem": {
+                G: 1,
+                softeningFactor: 20,
+                timeFactor: 0.1,
+                camera: {
+                    x: 0,
+                    y: 0,
+                    zoom: 0.4
+                },
+                followCenterOfSimulation: false,
+                clearStrength: 1
+            },
+            "galaxy": {
+                G: 1,
+                softeningFactor: 20,
+                timeFactor: 0.1,
+                camera: {
+                    x: 0,
+                    y: 0,
+                    zoom: 0.1
+                },
+                followCenterOfSimulation: true,
+                clearStrength: 1
+            }
+        }
+        this.currentScenario = this.avaiableScenarios[0]
 
         this.gui = new dat.GUI()
         this.guiElement = {
@@ -33,8 +61,6 @@ class Simulation {
             controller: []
         }
         this.event = {}
-
-        this.defaultSettings = { G: 1, softeningFactor: this.softeningFactor, timeFactor: this.timeFactor, camera: { ...this.camera }, followCenterOfSimulation: this.followCenterOfSimulation }
         window.addEventListener('resize', () => {
             this.canvas.width = window.innerWidth
             this.canvas.height = window.innerHeight
@@ -43,33 +69,41 @@ class Simulation {
         this.init()
     }
     init() {
+        this.clearCanvas(1, "black")
+        this.loadScenario()
 
         let SimulationFolder = this.gui.addFolder("Simulation");
         SimulationFolder.open()
         this.guiElement.folder.push(SimulationFolder)
 
-        let cameraZoomController = SimulationFolder.add(this.camera, 'zoom', 0, 1);
-        cameraZoomController.name('Camera zoom');
+        let scenatioController = SimulationFolder.add(this, 'currentScenario', this.avaiableScenarios);
+        scenatioController.onChange(() => {
+            this.reset()
+        })
         let softeningController = SimulationFolder.add(this, 'softeningFactor', 0, 100);
         let timeFactorController = SimulationFolder.add(this, 'timeFactor', 0.01, 1.00);
-        let FollowCenterController = SimulationFolder.add(this, 'followCenterOfSimulation');
-        FollowCenterController.name('Camera centered');
+
+        let cameraZoomController = SimulationFolder.add(this.camera, 'zoom', 0, 1);
+        cameraZoomController.onChange(() => {
+            this.draw()
+        })
+        cameraZoomController.name('Camera zoom');
+        let followCenterController = SimulationFolder.add(this, 'followCenterOfSimulation');
+        followCenterController.name('Camera centered');
+
+        let clearStrengthController = SimulationFolder.add(this, 'clearStrength', 0.1, 1);
 
         this.handleMouseAddBody()
-        this.loadExemple()
 
         let resetController = this.gui.add(this, 'reset');
-        this.guiElement.controller.push(cameraZoomController, softeningController, timeFactorController, FollowCenterController, resetController)
+        resetController.name('Rest Scenario')
+        this.guiElement.controller.push(scenatioController, cameraZoomController, softeningController, timeFactorController, followCenterController, resetController, clearStrengthController)
 
 
     }
     reset() {
         for (const event in this.event) {
             this.canvas.removeEventListener(event, this.event[event])
-        }
-        for (const settingName in this.defaultSettings) {
-            const setting = this.defaultSettings[settingName];
-            this[settingName] = JSON.parse(JSON.stringify(setting)) // sry
         }
         this.gui.destroy()
         this.gui = new dat.GUI()
@@ -85,7 +119,6 @@ class Simulation {
         let AddBodyParameterFoler = this.gui.addFolder("Add Body Parameter");
         AddBodyParameterFoler.open()
         this.guiElement.folder.push(AddBodyParameterFoler)
-
 
         let AddBodyMassController = AddBodyParameterFoler.add(body, 'mass')
         let AddBodyColorController = AddBodyParameterFoler.addColor(body, 'color')
@@ -131,14 +164,40 @@ class Simulation {
         this.event.mousemove = mouseMove
 
     }
+    loadScenario() {
+        for (const setting in this.scenarioSettings[this.currentScenario]) {
+            this[setting] = JSON.parse(JSON.stringify(this.scenarioSettings[this.currentScenario][setting]))
+        }
 
-    loadExemple() {
+        switch (this.currentScenario) {
+            case 'twoPlanetStarSystem':
+                this.addBody(0, 0, null, 10, true, "yellow");
 
-        this.addBody(0, 0, null, 10, true, "yellow");
-        this.addBody(0, -250, { x: 3.25, y: 0 }, 1);
-        this.addBody(0, 250, { x: -3.25, y: 0 }, 1);
-        this.addBody(0, 260, { x: -4.0, y: 0 }, 0.001);
+                this.addBody(0, 100, { x: -3.24, y: 0 }, 0.5, false, "brown");
 
+                this.addBody(0, -500, { x: 3.24, y: 0 }, 2, false, "red");
+                this.addBody(0, 500, { x: -3.24, y: 0 }, 2, false, "green");
+                this.addBody(0, 520, { x: -4.0, y: 0 }, 0.001);
+
+                this.addBody(-1500, 0, { x: 0, y: -4.0, }, 1);
+                break;
+            case 'galaxy':
+                this.followCenterOfSimulation = true
+                for (let i = 0; i < 100; i++) {
+                    let radius = 1000
+                    let angle = Math.random() * Math.PI * 2;
+                    let hypotenuse = Math.sqrt(Math.random()) * radius;
+                    let adjacent = Math.cos(angle) * hypotenuse
+                    let opposite = Math.sin(angle) * hypotenuse
+                    let x = adjacent
+                    let y = opposite
+                    let v = { x: 0, y: 0 }
+                    this.addBody(x, y, null, 1, false)
+                }
+                break
+            default:
+                break;
+        }
     }
     update(delta) {
         this.CenterOfSimulation = { x: 0, y: 0 }
@@ -170,7 +229,6 @@ class Simulation {
                 this.CenterOfSimulation.y += body.y
             }
         }
-
         if (this.followCenterOfSimulation === true) {
             this.CenterOfSimulation.x = this.CenterOfSimulation.x / this.bodies.length
             this.CenterOfSimulation.y = this.CenterOfSimulation.y / this.bodies.length
@@ -179,12 +237,16 @@ class Simulation {
             this.camera.y = this.CenterOfSimulation.y
         }
     }
-    draw() {
-        this.ctx.fillStyle = "rgba(0,0,0,1.0)";
+    clearCanvas(strength, color) {
+        this.ctx.fillStyle = `${color}`;
+        ctx.globalAlpha = strength
         ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.globalAlpha = 1
+    }
+    draw() {
+        this.clearCanvas(this.clearStrength, "black")
 
         if (this.addBodyClicked) {
-
             let clickXFromCam = (this.addbodyClickedInfo.startX - this.camera.x) * this.camera.zoom
             let clickYFromCam = (this.addbodyClickedInfo.startY - this.camera.y) * this.camera.zoom
             let clickXOnCanva = clickXFromCam + this.canvas.width / 2
@@ -197,7 +259,6 @@ class Simulation {
             this.ctx.lineTo(this.mousePositionOnCanvas.x, this.mousePositionOnCanvas.y)
             ctx.stroke()
         }
-
 
         for (let i = 0; i < this.bodies.length; i++) {
             let body = this.bodies[i];
@@ -226,7 +287,7 @@ class Simulation {
 }
 const simulation = new Simulation(canvas);
 
-let fps = 60;
+let fps = 30;
 let frameRate = 1000 / fps;
 let last = Date.now()
 let timeSinceLastFrame = 0;
@@ -240,5 +301,4 @@ function animate() {
     }
     requestAnimationFrame(animate);
 }
-
 animate()
